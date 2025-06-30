@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Terminal Command Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- 
+        Chosen Palette: Slate & Blue
+        Application Structure Plan: The application is structured into thematic tabs for intuitive navigation (Welcome, Basics, Navigation, etc.). This is more user-friendly than a linear Q&A format, allowing users to focus on specific areas of interest. The core interaction revolves around "command cards," which present information in digestible chunks. A search bar provides quick access, and a welcome chart offers a high-level visual overview. This structure prioritizes self-directed learning and quick reference over testing.
+        Visualization & Content Choices: 
+        - Report Info: Command categories -> Goal: Inform/Orient -> Viz: Bar Chart (Chart.js) -> Interaction: None (static display) -> Justification: Provides a quick visual summary of the tool's scope on the welcome page.
+        - Report Info: Individual commands (ls, cd, etc.) -> Goal: Inform/Explain -> Viz: Styled HTML cards -> Interaction: Clickable tabs to switch sections, search bar to filter cards, "Explain More" button for LLM explanation -> Justification: Cards organize information cleanly. Tabs allow focused learning. Search provides fast lookup. LLM integration provides dynamic, in-depth explanations on demand.
+        - Report Info: Chaining operators (|, &&, ||) -> Goal: Compare/Explain Flow -> Viz: HTML/Tailwind diagrams -> Interaction: Static visual aid -> Justification: Visual diagrams are more effective than text alone for explaining abstract data flow concepts.
+        CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
+    -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .fira-code {
+            font-family: 'Fira Code', monospace;
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .nav-link {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-7xl">
+
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-slate-900">Interactive Terminal Guide</h1>
+            <p class="mt-2 text-lg text-slate-600">An easy way to learn and review essential command-line tools.</p>
+        </header>
+
+        <div class="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-sm py-4 mb-8">
+             <div class="mb-6">
+                <input type="text" id="search-bar" placeholder="🔎 Search for a command (e.g., 'copy')" class="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <nav class="flex flex-wrap justify-center gap-2 sm:gap-4" id="nav-links">
+                <a data-target="welcome" class="nav-link px-4 py-2 rounded-md bg-blue-500 text-white font-semibold shadow">Welcome</a>
+                <a data-target="basics" class="nav-link px-4 py-2 rounded-md bg-white text-slate-700 font-semibold shadow-sm hover:bg-slate-100">Basics</a>
+                <a data-target="navigation" class="nav-link px-4 py-2 rounded-md bg-white text-slate-700 font-semibold shadow-sm hover:bg-slate-100">Navigation</a>
+                <a data-target="file-ops" class="nav-link px-4 py-2 rounded-md bg-white text-slate-700 font-semibold shadow-sm hover:bg-slate-100">File Ops</a>
+                <a data-target="chaining" class="nav-link px-4 py-2 rounded-md bg-white text-slate-700 font-semibold shadow-sm hover:bg-slate-100">Chaining & Redirection</a>
+                <a data-target="advanced" class="nav-link px-4 py-2 rounded-md bg-white text-slate-700 font-semibold shadow-sm hover:bg-slate-100">Advanced</a>
+            </nav>
+        </div>
+
+        <main id="main-content">
+
+            <!-- Welcome Section -->
+            <section id="welcome" class="content-section active">
+                <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                    <h2 class="text-2xl font-bold mb-4">Welcome to Your Interactive Guide!</h2>
+                    <p class="mb-6 text-slate-600">This tool helps you master the command line by breaking down commands into simple, easy-to-understand concepts. Use the tabs above to navigate between categories or use the search bar to find a specific command instantly. The chart below shows a breakdown of the command categories covered in this guide.</p>
+                    <div class="chart-container">
+                        <canvas id="commandsChart"></canvas>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Basics Section -->
+            <section id="basics" class="content-section">
+                <div class="text-center mb-6">
+                     <h2 class="text-2xl font-bold">File & Directory Basics</h2>
+                     <p class="text-slate-600">The essential commands for viewing and creating files and folders.</p>
+                </div>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 command-card-container">
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">ls</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Lists the contents of a directory.</p>
+                        <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">ls -l</code>
+                        <p class="text-sm text-slate-500 mt-1">Shows a "long" list with details like permissions, owner, and modification date.</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-2">ls -a</code>
+                        <p class="text-sm text-slate-500 mt-1">Shows 'all' files, including hidden ones that start with a `.`.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">pwd</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Prints the full path of the current working directory.</p>
+                         <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">pwd</code>
+                        <p class="text-sm text-slate-500 mt-1">Output might be: `/home/user/documents`</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">clear</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Clears all previous output from the terminal screen.</p>
+                        <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">clear</code>
+                        <p class="text-sm text-slate-500 mt-1">Gives you a fresh, clean terminal view.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">mkdir</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Creates a new directory.</p>
+                         <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">mkdir my_project</code>
+                        <p class="text-sm text-slate-500 mt-1">Creates a new folder named `my_project`.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                     <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">touch</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Creates a new, empty file or updates the timestamp of an existing file.</p>
+                        <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">touch new_file.txt</code>
+                        <p class="text-sm text-slate-500 mt-1">Creates an empty file named `new_file.txt`.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">rm</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Removes (deletes) files. Be careful with this command!</p>
+                         <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">rm old_file.txt</code>
+                        <p class="text-sm text-slate-500 mt-1">Deletes the file `old_file.txt`.</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-2">rm -r old_folder/</code>
+                        <p class="text-sm text-slate-500 mt-1">Recursively deletes a folder and all its contents.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Navigation Section -->
+            <section id="navigation" class="content-section">
+                 <div class="text-center mb-6">
+                     <h2 class="text-2xl font-bold">Navigating the Filesystem</h2>
+                     <p class="text-slate-600">Commands for moving around your computer's directory structure.</p>
+                </div>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 command-card-container">
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">cd</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Changes the current directory.</p>
+                         <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">cd documents/reports</code>
+                        <p class="text-sm text-slate-500 mt-1">Navigates into the `reports` subdirectory.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                     <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">cd ..</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Moves you one directory level up (to the parent directory).</p>
+                        <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">cd ..</code>
+                        <p class="text-sm text-slate-500 mt-1">If you are in `/home/user/docs`, this takes you to `/home/user`.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">cd ~</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Takes you directly to your home directory from anywhere.</p>
+                        <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">cd ~</code>
+                        <p class="text-sm text-slate-500 mt-1">A quick shortcut to get back to your personal home folder.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- File Ops Section -->
+            <section id="file-ops" class="content-section">
+                 <div class="text-center mb-6">
+                     <h2 class="text-2xl font-bold">Moving & Copying</h2>
+                     <p class="text-slate-600">Essential commands for managing your files and directories.</p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-6 command-card-container">
+                     <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">cp</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Creates a copy of a file or directory.</p>
+                        <p class="font-semibold">Copy a file:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">cp source.txt destination.txt</code>
+                        <p class="font-semibold mt-2">Copy a directory:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">cp -r source_dir/ destination_dir/</code>
+                         <p class="text-sm text-slate-500 mt-1">The `-r` flag means "recursive" and is required to copy a directory and its contents.</p>
+                         <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">mv</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Moves a file or directory (can also be used to rename).</p>
+                        <p class="font-semibold">Move a file:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">mv old_path/file.txt new_path/</code>
+                        <p class="font-semibold mt-2">Rename a file:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">mv old_name.txt new_name.txt</code>
+                        <p class="text-sm text-slate-500 mt-1">`mv` relocates the original file, it doesn't leave a copy behind.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Chaining Section -->
+            <section id="chaining" class="content-section">
+                <div class="text-center mb-6">
+                     <h2 class="text-2xl font-bold">Chaining & Redirection</h2>
+                     <p class="text-slate-600">Combine commands and control their input/output for powerful workflows.</p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-6 command-card-container">
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">&& (AND)</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Runs the next command ONLY if the previous one was successful.</p>
+                        <div class="flex items-center justify-center space-x-2 p-3 bg-slate-100 rounded-md">
+                            <span class="fira-code p-2 bg-blue-100 rounded">command1</span>
+                            <span class="font-bold text-blue-600 text-xl">&amp;&amp;</span>
+                            <span class="fira-code p-2 bg-blue-100 rounded">command2</span>
+                        </div>
+                         <p class="text-sm text-slate-500 mt-2">Useful for sequences like `git pull && npm install`.</p>
+                         <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">|| (OR)</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Runs the next command ONLY if the previous one failed.</p>
+                         <div class="flex items-center justify-center space-x-2 p-3 bg-slate-100 rounded-md">
+                            <span class="fira-code p-2 bg-red-100 rounded">command1</span>
+                            <span class="font-bold text-red-600 text-xl">||</span>
+                            <span class="fira-code p-2 bg-green-100 rounded">fallback_command</span>
+                        </div>
+                        <p class="text-sm text-slate-500 mt-2">Perfect for error handling: `rmdir temp || echo 'Error!'`.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">; (Separator)</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Runs the next command regardless of the previous one's success or failure.</p>
+                        <div class="flex items-center justify-center space-x-2 p-3 bg-slate-100 rounded-md">
+                            <span class="fira-code p-2 bg-slate-200 rounded">command1</span>
+                            <span class="font-bold text-slate-600 text-xl">;</span>
+                            <span class="fira-code p-2 bg-slate-200 rounded">command2</span>
+                        </div>
+                        <p class="text-sm text-slate-500 mt-2">Good for running a simple sequence of independent tasks: `date ; pwd`.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">| (Pipe)</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Sends the output of one command as the input for another.</p>
+                         <div class="flex items-center justify-center space-x-2 p-3 bg-slate-100 rounded-md">
+                            <span class="fira-code p-2 bg-purple-100 rounded">command1</span>
+                             <div class="flex-grow h-1 bg-purple-300 relative">
+                                <span class="absolute -top-2 right-0 text-purple-600">&gt;</span>
+                            </div>
+                            <span class="fira-code p-2 bg-purple-100 rounded">command2</span>
+                        </div>
+                        <p class="text-sm text-slate-500 mt-2">Example: `history | grep "cd"` finds all "cd" commands in your history.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                     <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">> (Overwrite)</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Redirects command output to a file, overwriting the file if it exists.</p>
+                        <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">ls -l > file_list.txt</code>
+                        <p class="text-sm text-slate-500 mt-1">Saves the directory listing to `file_list.txt`.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">>> (Append)</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Redirects command output to a file, adding to the end of the file.</p>
+                         <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">date >> log.txt</code>
+                        <p class="text-sm text-slate-500 mt-1">Adds the current date to `log.txt` without deleting old entries.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Advanced Section -->
+            <section id="advanced" class="content-section">
+                 <div class="text-center mb-6">
+                     <h2 class="text-2xl font-bold">Advanced Utilities</h2>
+                     <p class="text-slate-600">Powerful tools for searching, permissions, and process management.</p>
+                </div>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 command-card-container">
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">grep</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Searches for specific text inside files.</p>
+                        <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">grep "error" server.log</code>
+                        <p class="text-sm text-slate-500 mt-1">Finds all lines containing the word "error" in `server.log`.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                     <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">find</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Searches for files and directories based on criteria like name, size, or type.</p>
+                         <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">find . -name "*.js"</code>
+                        <p class="text-sm text-slate-500 mt-1">Finds all files ending with `.js` in the current directory and its subdirectories.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                    <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">chmod</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Changes the permissions (read, write, execute) of a file or directory.</p>
+                        <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">chmod +x my_script.sh</code>
+                        <p class="text-sm text-slate-500 mt-1">Makes `my_script.sh` executable, so it can be run as a program.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                     <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">ps</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Displays information about currently running processes.</p>
+                         <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">ps aux</code>
+                        <p class="text-sm text-slate-500 mt-1">Shows a detailed list of all processes running on the system.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                     <div class="command-card bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold fira-code command-name">history</h3>
+                        <p class="text-slate-600 mt-2 mb-4">Shows a list of the commands you've previously run.</p>
+                         <p class="font-semibold">Example:</p>
+                        <code class="fira-code bg-slate-100 p-2 rounded-md block mt-1">history | tail -n 10</code>
+                        <p class="text-sm text-slate-500 mt-1">Shows the last 10 commands you've used.</p>
+                        <button class="explain-more-btn mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200 shadow-md">✨ Explain More</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Explanation Modal -->
+        <div id="explanationModal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h3 id="modal-command-title" class="text-2xl font-bold text-slate-900 mb-4"></h3>
+                <div id="modal-explanation-content" class="text-slate-700 leading-relaxed">
+                    <div class="spinner"></div>
+                    <p class="text-center text-slate-600">Generating explanation...</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const contentSections = document.querySelectorAll('.content-section');
+            const searchBar = document.getElementById('search-bar');
+            const explainMoreButtons = document.querySelectorAll('.explain-more-btn');
+            const explanationModal = document.getElementById('explanationModal');
+            const closeModalButton = document.querySelector('.close-button');
+            const modalCommandTitle = document.getElementById('modal-command-title');
+            const modalExplanationContent = document.getElementById('modal-explanation-content');
+
+            function switchTab(targetId) {
+                navLinks.forEach(link => {
+                    if (link.dataset.target === targetId) {
+                        link.classList.add('bg-blue-500', 'text-white');
+                        link.classList.remove('bg-white', 'text-slate-700', 'hover:bg-slate-100');
+                    } else {
+                        link.classList.remove('bg-blue-500', 'text-white');
+                        link.classList.add('bg-white', 'text-slate-700', 'hover:bg-slate-100');
+                    }
+                });
+
+                contentSections.forEach(section => {
+                    if (section.id === targetId) {
+                        section.classList.add('active');
+                    } else {
+                        section.classList.remove('active');
+                    }
+                });
+            }
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    switchTab(this.dataset.target);
+                });
+            });
+
+            searchBar.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                const allCards = document.querySelectorAll('.command-card');
+                
+                let foundInActiveTab = false;
+
+                allCards.forEach(card => {
+                    const cardText = card.textContent.toLowerCase();
+                    const cardParentSection = card.closest('.content-section');
+                    
+                    if (cardText.includes(searchTerm)) {
+                        card.style.display = 'block';
+                        if (searchTerm && !foundInActiveTab && !cardParentSection.classList.contains('active')) {
+                           switchTab(cardParentSection.id);
+                           foundInActiveTab = true;
+                        }
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+
+            const ctx = document.getElementById('commandsChart').getContext('2d');
+            const commandsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Basics', 'Navigation', 'File Ops', 'Chaining/Redirect', 'Advanced'],
+                    datasets: [{
+                        label: 'Number of Commands',
+                        data: [6, 3, 2, 6, 5],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.7)',
+                            'rgba(34, 197, 94, 0.7)',
+                            'rgba(249, 115, 22, 0.7)',
+                            'rgba(168, 85, 247, 0.7)',
+                            'rgba(239, 68, 68, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(34, 197, 94, 1)',
+                            'rgba(249, 115, 22, 1)',
+                            'rgba(168, 85, 247, 1)',
+                            'rgba(239, 68, 68, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.dataset.label}: ${context.raw}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        x: {
+                             ticks: {
+                                maxRotation: 0,
+                                minRotation: 0,
+                                autoSkip: false,
+                                callback: function(value, index, values) {
+                                    let label = this.getLabelForValue(value);
+                                    if (label.length > 10) {
+                                        return label.split(' ');
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // LLM Integration Logic
+            explainMoreButtons.forEach(button => {
+                button.addEventListener('click', async function() {
+                    const commandName = this.closest('.command-card').querySelector('.command-name').textContent.trim();
+                    
+                    modalCommandTitle.textContent = `Explanation for: ${commandName}`;
+                    modalExplanationContent.innerHTML = '<div class="spinner"></div><p class="text-center text-slate-600">Generating explanation...</p>';
+                    explanationModal.style.display = 'flex'; // Use flex to center
+
+                    try {
+                        let chatHistory = [];
+                        const prompt = `Provide a detailed explanation of the Unix/Linux terminal command: ${commandName}. Include its primary purpose, common usage examples with flags, and any important considerations or common pitfalls. Format the explanation clearly and concisely.`;
+                        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                        const payload = { contents: chatHistory };
+                        const apiKey = ""; 
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const result = await response.json();
+
+                        if (result.candidates && result.candidates.length > 0 &&
+                            result.candidates[0].content && result.candidates[0].content.parts &&
+                            result.candidates[0].content.parts.length > 0) {
+                            const text = result.candidates[0].content.parts[0].text;
+                            modalExplanationContent.innerHTML = `<p>${text.replace(/\n/g, '<br>')}</p>`; // Replace newlines with <br> for HTML display
+                        } else {
+                            modalExplanationContent.innerHTML = '<p class="text-red-500">Failed to get explanation. Please try again.</p>';
+                        }
+                    } catch (error) {
+                        modalExplanationContent.innerHTML = `<p class="text-red-500">An error occurred: ${error.message}</p>`;
+                        console.error("Error fetching explanation:", error);
+                    }
+                });
+            });
+
+            closeModalButton.addEventListener('click', function() {
+                explanationModal.style.display = 'none';
+            });
+
+            window.addEventListener('click', function(event) {
+                if (event.target === explanationModal) {
+                    explanationModal.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
